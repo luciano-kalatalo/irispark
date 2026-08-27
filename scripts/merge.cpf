@@ -1,0 +1,13 @@
+; IrisPark CI CPF merge file
+; Creates the DATASPARK database + "dataspark" namespace at container boot.
+; Mounted at /config/merge.cpf and applied via ISC_CPF_MERGE_FILE.
+;
+; The CI service runs the stock intersystemsdc/iris-community image WITHOUT
+; ISC_DATA_DIRECTORY (no first-boot data-dir move), so the database directory
+; lives under the default install mgr dir.
+
+[Actions]
+
+CreateDatabase:Name=DATASPARK,Directory=/usr/irissys/mgr/dataspark
+
+CreateNamespace:Name=dataspark,Globals=DATASPARK,Routines=DATASPARK

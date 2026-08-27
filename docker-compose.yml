@@ -1,0 +1,50 @@
+services:
+  iris:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.iris
+    image: irispark-iris:2026.2
+    container_name: irispark-iris
+    ports:
+      - "3972:1972"
+      - "52774:52773"
+    environment:
+      ISC_CPF_MERGE_FILE: /config/merge.cpf
+      # Embedded Python (EPython SQL functions) resolves imports through these
+      # paths: mgr/python holds the ML stack + InterSystems AutoML provider;
+      # lib/automl is the official package-isolation path (GIML_Configuration_Providers).
+      PYTHONPATH: /usr/irissys/mgr/python:/usr/irissys/lib/automl
+    volumes:
+      - ./scripts/merge.cpf:/config/merge.cpf:ro
+      - ./scripts/iris.init:/usr/irissys/iris.init:ro
+      # Shared demo data: notebooks write ./data (jupyter mount); IRIS reads
+      # the same files at /irispark-data for foreign=True table reads.
+      - ./data:/irispark-data
+    stop_grace_period: 60s
+
+  jupyter:
+    image: jupyter/minimal-notebook:python-3.10.11
+    container_name: irispark-jupyter
+    user: root
+    depends_on:
+      - iris
+    ports:
+      - "8890:8888"
+    environment:
+      NB_USER: user
+      CHOWN_HOME: "yes"
+      CHOWN_HOME_OPTS: "-R"
+      IRIS_HOST: iris
+      IRIS_PORT: "1972"
+      IRIS_NAMESPACE: DATASPARK
+      IRIS_USERNAME: suser
+      IRIS_PASSWORD: pass123
+      IRISPARK_UDC_PATH: /usr/irissys/mgr/python/irispark_udc.py
+    volumes:
+      - .:/home/user/irispark-mvp
+    working_dir: /home/user/irispark-mvp
+    command: >
+      bash -c "
+        pip install -e /home/user/irispark-mvp &&
+        exec /opt/conda/bin/jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token=''
+      "

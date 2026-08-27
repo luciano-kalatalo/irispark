@@ -1,0 +1,11 @@
+FROM intersystemsdc/iris-community:2026.2
+
+USER root
+COPY scripts/init_iris.script /tmp/init_iris.script
+COPY docker/iris-entrypoint.sh /iris-entrypoint.sh
+COPY irispark/sql/udf/irispark_udc.py /usr/irissys/mgr/python/irispark_udc.py
+RUN chmod +x /iris-entrypoint.sh /tmp/init_iris.script
+USER irisowner
+
+ENTRYPOINT ["/iris-entrypoint.sh"]
+CMD ["iris"]

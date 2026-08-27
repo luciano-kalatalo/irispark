@@ -1,0 +1,90 @@
+; IrisPark CI/dev initialization script
+; Run from the host:  docker exec <iris-container> iris session IRIS -U %SYS < scripts/init_iris.script
+; Idempotent: safe to run multiple times on the same instance.
+;
+; Mirrors the local dev environment recipe (merge.cpf + init.sh):
+;   1. Create DATASPARK database + "dataspark" namespace if missing
+;   2. Create "suser" user (password "pass123", roles %All, namespace dataspark)
+;   3. Seed the "vendas" table used by the online tests
+;
+; NOTE: statements are kept single-line because `iris session` reads
+; piped input line by line; multi-line { } blocks fail to parse.
+
+; --- 1. Database + namespace -------------------------------------------------
+WRITE "== 1. Namespace ==", !
+
+SET nsExists = ##class(Config.Namespaces).Exists("dataspark")
+IF nsExists { WRITE "Namespace 'dataspark' already exists", ! }
+IF 'nsExists { SET dbDir = $SYSTEM.Util.ManagerDirectory() _ "dataspark" }
+IF 'nsExists { SET sc = ##class(%Library.File).CreateDirectoryChain(dbDir) }
+IF 'nsExists { IF 'sc { WRITE "mkdir failed: ", $SYSTEM.Status.GetErrorText(sc), ! HALT } }
+IF 'nsExists { SET sc = ##class(SYS.Database).CreateDatabase("DATASPARK", dbDir) }
+IF 'nsExists { IF 'sc { WRITE "DB create failed: ", $SYSTEM.Status.GetErrorText(sc), ! HALT } }
+IF 'nsExists { SET sc = ##class(Config.Namespaces).Create("dataspark", "DATASPARK", "DATASPARK") }
+IF 'nsExists { IF 'sc { WRITE "Namespace create failed: ", $SYSTEM.Status.GetErrorText(sc), ! HALT } }
+IF 'nsExists { WRITE "Created database DATASPARK + namespace 'dataspark'", ! }
+
+; --- 2. User -----------------------------------------------------------------
+WRITE "== 2. User ==", !
+
+SET props("Roles") = "%All"
+SET props("Password") = "pass123"
+SET props("FullName") = "suser"
+SET props("NameSpace") = "dataspark"
+SET props("Routine") = ""
+SET props("ExpirationDate") = ""
+SET props("ChangePassword") = 0
+SET props("Enabled") = 1
+SET props("Comment") = "IrisPark CI/dev user"
+SET props("AccountNeverExpires") = 1
+SET props("PasswordNeverExpires") = 1
+
+SET userExists = ##class(Security.Users).Exists("suser", .user, .status)
+IF userExists { SET sc = ##class(Security.Users).Modify("suser", .props) }
+IF 'userExists { SET sc = ##class(Security.Users).Create("suser", .props) }
+IF 'sc { WRITE "User create failed: ", $SYSTEM.Status.GetErrorText(sc), ! HALT }
+WRITE "User 'suser' configured", !
+
+; --- 3. Seed data ------------------------------------------------------------
+WRITE "== 3. Seed ==", !
+
+ZNSPACE "dataspark"
+
+IF $SYSTEM.SQL.TableExists("vendas") { WRITE "Table 'vendas' already exists with data", ! HALT }
+
+SET sql = ##class(%SQL.Statement).%New()
+
+SET status = sql.%Prepare("CREATE TABLE vendas (id INT, cidade VARCHAR(50), estado VARCHAR(2), valor DOUBLE, data DATE)")
+IF 'status { WRITE "DDL Error: ", $SYSTEM.Status.GetErrorText(status), ! HALT }
+DO sql.%Execute()
+WRITE "Created table 'vendas'", !
+
+; Indexes expected by the online diagnostics tests (test_iris_diagnostics.py).
+SET status = sql.%Prepare("CREATE BITMAP INDEX idx_vendas_cidade_bmp ON vendas (cidade)")
+IF 'status { WRITE "Index Error: ", $SYSTEM.Status.GetErrorText(status), ! }
+DO sql.%Execute()
+SET status = sql.%Prepare("CREATE BITMAP INDEX idx_vendas_estado_bmp ON vendas (estado)")
+IF 'status { WRITE "Index Error: ", $SYSTEM.Status.GetErrorText(status), ! }
+DO sql.%Execute()
+SET status = sql.%Prepare("CREATE COLUMNAR INDEX idx_vendas_valor_col ON vendas (valor)")
+IF 'status { WRITE "Index Error: ", $SYSTEM.Status.GetErrorText(status), ! }
+DO sql.%Execute()
+WRITE "Created vendas indexes", !
+
+SET status = sql.%Prepare("INSERT INTO vendas (id, cidade, estado, valor, data) VALUES (?, ?, ?, ?, TO_DATE(?, 'YYYY-MM-DD'))")
+IF 'status { WRITE "Insert Error: ", $SYSTEM.Status.GetErrorText(status), ! HALT }
+
+DO sql.%Execute(1, "Sao Paulo", "SP", 200.00, "2025-01-15")
+DO sql.%Execute(2, "Campinas", "SP", 180.00, "2025-01-20")
+DO sql.%Execute(3, "Santos", "SP", 160.00, "2025-02-01")
+DO sql.%Execute(4, "Sao Paulo", "SP", 120.00, "2025-02-10")
+DO sql.%Execute(5, "Rio de Janeiro", "RJ", 250.00, "2025-01-18")
+DO sql.%Execute(6, "Niteroi", "RJ", 90.00, "2025-02-05")
+DO sql.%Execute(7, "Rio de Janeiro", "RJ", 300.00, "2025-03-01")
+DO sql.%Execute(8, "Belo Horizonte", "MG", 150.00, "2025-01-22")
+DO sql.%Execute(9, "Uberlandia", "MG", 80.00, "2025-02-15")
+DO sql.%Execute(10, "Sao Paulo", "SP", 175.00, "2025-03-10")
+DO sql.%Execute(11, "Campinas", "SP", 110.00, "2025-03-12")
+DO sql.%Execute(12, "Belo Horizonte", "MG", 95.00, "2025-03-15")
+WRITE "Inserted 12 rows into 'vendas'", !
+HALT
