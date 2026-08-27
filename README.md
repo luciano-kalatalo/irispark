@@ -46,13 +46,13 @@ It provides the familiar PySpark DataFrame and RDD APIs while translating every 
 
 ## High‑level architecture
 
-```mermaid
+
 flowchart TB
     A[User code (PySpark‑like)] --> B[IrisPark API (Session, DataFrame, Functions)]
     B --> C[Lazy SQL Generator (DAG → IRIS SQL)]
     C --> D[InterSystems IRIS SQL Engine (optimizer, indexes, columnar storage)]
     D --> E[Arrow RecordBatch ↔ Pandas / Polars / Dask]
-```
+
 *Data flow: user code → IrisPark API → lazy DAG → IRIS‑native SQL → Arrow bridge → Python data‑science libraries.*
 
 ## Quick example
