@@ -1352,6 +1352,8 @@ class IrisDataFrame:
         import polars as pl
         return pl.from_arrow(pa.Table.from_batches([self.to_arrow()]))
 
+    toPolars = to_polars
+
     def show(self, n: int = 10) -> None:
         if self.limit_n is not None:
             n = min(n, self.limit_n)
