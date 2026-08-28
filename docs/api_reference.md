@@ -29,6 +29,16 @@ classification, see [Migration Guide](migration.md).
 | `types` | Data types module |
 | `functions` | SQL functions module |
 
+### `irispark.sql` namespace (PySpark-compatible)
+
+```python
+from irispark.sql import DataFrame, Column, IrisParkSession, Row, Window, WindowSpec, types, functions
+```
+
+A compatibility namespace mirroring `pyspark.sql`. `functions` and `types` re-export
+the top-level modules, so `from irispark.sql import functions as F` works like PySpark.
+This is the "import change only" migration path from `docs/migration.md`.
+
 ---
 
 ## Session
@@ -81,6 +91,16 @@ session = IrisParkSession.builder() \
 `collect`, `first`, `take`, `head`, `tail`, `count`, `show`, `toPandas`/`to_pandas`,
 `toPolars`/`to_polars`, `to_sql`, `explain`, `lineage`, `printSchema`, `schema`,
 `dtypes`, `describe`, `summary`, `isEmpty`.
+
+### Caching
+
+`cache`, `persist`, `unpersist` — materialize a DataFrame once so repeated actions
+stop re-scanning.
+
+### GroupedData
+
+`groupBy(...).agg(...)`, `sum`, `avg`/`mean`, `count`, `min`, `max`, `pivot`,
+`cube`, `rollup`. `pivot` is a `GroupedData` method: `df.groupBy(...).pivot(...)`.
 
 ### `df.iris` namespace
 
@@ -154,10 +174,80 @@ df.withColumn("rn", row_number().over(w)) \
 
 ---
 
-## ML Transformers (`irispark.ml`)
+## ML (`irispark.ml`)
 
-`VectorAssembler`, `StringIndexer`, `OneHotEncoder`, `StandardScaler`,
-`QuantileDiscretizer`.
+A PySpark `pyspark.ml`-compatible framework. Execution is delegated to the most
+appropriate backend per operation (native SQL, ObjectScript, Embedded Python, or
+IntegratedML AutoML). See `ml_scope.md` for the full design and roadmap.
+
+### Core framework
+
+| Symbol | Description |
+|---|---|
+| `Transformer` / `Estimator` / `Model` | Base classes with the `fit`/`transform` contract |
+| `Pipeline` / `PipelineModel` | Stage composition |
+| `Param` / `Params` / `TypeConverters` | Parameter system |
+| `LogicalVector` | Metadata-only feature vector |
+| `MLSemanticPlanner` / `BackendType` / `BackendCapability` | Backend capability registry |
+
+### Feature transformers
+
+| Symbol | Description |
+|---|---|
+| `VectorAssembler` | Assemble feature columns (emits a comma-joined string column) |
+| `StringIndexer` / `StringIndexerModel` | Encode string categories to indices |
+| `OneHotEncoder` / `OneHotEncoderModel` | One-hot encode indexed categories |
+| `StandardScaler` / `StandardScalerModel` | Standardize (z-score) |
+| `QuantileDiscretizer` / `QuantileDiscretizerModel` | Bucket into quantile bins |
+| `Imputer` / `ImputerModel` | Fill missing values (mean/median/mode) |
+| `Binarizer` | Threshold to 0/1 |
+| `MinMaxScaler` / `MinMaxScalerModel` | Scale to a range |
+| `MaxAbsScaler` / `MaxAbsScalerModel` | Scale by max absolute value |
+| `IndexToString` | Map indices back to labels |
+| `SQLTransformer` | Apply a SQL expression (`__THIS__` substitution) |
+
+### Supervised estimators
+
+| Symbol | Description |
+|---|---|
+| `LinearRegression` / `LinearRegressionModel` | Numpy fit, SQL-pushdown inference |
+| `LogisticRegression` / `LogisticRegressionModel` | Numpy gradient descent, SQL inference |
+
+### Ensemble (Embedded Python / sklearn backend)
+
+| Symbol | Description |
+|---|---|
+| `RandomForestClassifier` / `RandomForestRegressor` | sklearn RandomForest via EPython |
+| `KNeighborsClassifier` / `KNeighborsRegressor` | sklearn KNN via EPython |
+
+### Evaluation
+
+| Symbol | Description |
+|---|---|
+| `RegressionEvaluator` | MAE / MSE / RMSE / R² |
+| `BinaryClassificationEvaluator` | accuracy / precision / recall / F1 / AUC |
+
+### Tuning
+
+| Symbol | Description |
+|---|---|
+| `ParamGridBuilder` | Cartesian grid of `Param` values |
+| `CrossValidator` | k-fold cross-validation |
+| `TrainValidationSplit` | Single train/validation split |
+
+### Persistence
+
+| Symbol | Description |
+|---|---|
+| `save` / `load` / `load_by_name` | Persist / reload fitted models to IRIS |
+| `list_models` / `delete_model` | Inventory / remove persisted models |
+
+### IntegratedML AutoML (IRIS extension)
+
+| Symbol | Description |
+|---|---|
+| `AutoMLClassifier` / `AutoMLRegressor` / `AutoMLModel` | Wrap `CREATE MODEL` / `TRAIN MODEL` / `PREDICT` |
+| `CustomModelClassifier` / `CustomModelModel` | AutoML custom models via Embedded Python |
 
 ---
 
