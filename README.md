@@ -457,6 +457,4 @@ jupyter notebook notebooks/
 | [35 — Federate & Govern](notebooks/35_pw_federate_govern.ipynb) | Foreign table, cross-source join, write-back, credential hygiene |
 | [36 — Observe & Optimize](notebooks/36_pw_observe_optimize.ipynb) | `explain`/lineage, metrics, cache, SQL transparency |
 
-## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for release history and breaking changes.
